@@ -85,6 +85,7 @@ footer a{color:var(--accent);text-decoration:none}
 <button class="primary" onclick="generateCards()">New Game</button>
 <button onclick="window.print()">🖨 Print</button>
 <button onclick="resetMarks()">Reset Marks</button>
+<button onclick="shareGame()">🔗 Share</button>
 <button onclick="toggleCustomPanel()">✏️ Custom Tricks</button>
 </div>
 
@@ -293,7 +294,52 @@ marks[currentPlayer]=new Set([12]);
 renderGrid();renderTabs();
 }
 
-generateCards();
+function encodeGameState(){
+const state={d:document.getElementById('difficulty').value,c:cards,m:{}};
+for(const p in marks)state.m[p]=[...marks[p]];
+return btoa(JSON.stringify(state));
+}
+
+function decodeGameState(encoded){
+try{return JSON.parse(atob(encoded))}catch(e){return null}
+}
+
+function shareGame(){
+const encoded=encodeGameState();
+const url=new URL(window.location.href);
+url.search='?g='+encodeURIComponent(encoded);
+navigator.clipboard.writeText(url.toString()).then(()=>{
+showToast('Link copied to clipboard!');
+}).catch(()=>{
+prompt('Copy this link to share your game:',url.toString());
+});
+}
+
+function showToast(msg){
+const t=document.createElement('div');
+t.style.cssText='position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;padding:.6rem 1.2rem;border-radius:8px;font-size:.9rem;font-weight:600;z-index:200;animation:bingo-entrance .3s ease';
+t.textContent=msg;
+document.body.appendChild(t);
+setTimeout(()=>t.remove(),2500);
+}
+
+function loadFromURL(){
+const params=new URLSearchParams(window.location.search);
+const encoded=params.get('g');
+if(!encoded){generateCards();return}
+const state=decodeGameState(encoded);
+if(!state||!state.c||!state.c.length){generateCards();return}
+document.getElementById('difficulty').value=state.d||'intermediate';
+document.getElementById('players').value=state.c.length;
+cards=state.c;
+marks={};
+for(const p in state.m)marks[p]=new Set(state.m[p]);
+currentPlayer=0;
+renderTabs();
+renderGrid();
+}
+
+loadFromURL();
 </script>
 </body>
 </html>
