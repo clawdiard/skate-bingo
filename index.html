@@ -42,6 +42,21 @@ header p{color:var(--muted);margin-top:.3rem;font-size:.95rem}
 .player-tab .winner-badge{color:var(--green);margin-left:4px}
 footer{padding:2rem 1rem;text-align:center;color:var(--muted);font-size:.8rem;margin-top:auto}
 footer a{color:var(--accent);text-decoration:none}
+.custom-panel{width:100%;max-width:560px;padding:0 1rem}
+.custom-inner{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-top:.5rem}
+.custom-inner h3{font-size:1rem;margin-bottom:.2rem;color:var(--accent)}
+.custom-hint{font-size:.8rem;color:var(--muted);margin-bottom:.8rem}
+.custom-input-row{display:flex;gap:.5rem}
+.custom-input-row input{flex:1;padding:.5rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:.9rem}
+.custom-input-row input:focus{outline:none;border-color:var(--accent)}
+.custom-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:.8rem;min-height:1.5rem}
+.custom-tag{display:inline-flex;align-items:center;gap:4px;background:var(--cell-marked);border:1px solid var(--accent);border-radius:20px;padding:.25rem .6rem;font-size:.75rem;color:var(--accent)}
+.custom-tag .remove-tag{cursor:pointer;opacity:.6;font-size:.85rem}
+.custom-tag .remove-tag:hover{opacity:1}
+.custom-actions{display:flex;justify-content:space-between;align-items:center;margin-top:.6rem}
+.custom-count{font-size:.75rem;color:var(--muted)}
+.custom-actions button{font-size:.75rem;padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer}
+.custom-actions button:hover{border-color:var(--accent2);color:var(--accent2)}
 @media print{body{background:#fff;color:#000}.controls,.player-tabs,footer,header p{display:none}h1{-webkit-text-fill-color:#000;font-size:1.5rem}.cell{border:2px solid #000;background:#fff;color:#000;font-size:.6rem}.cell.marked{background:#fef3c7}.cell.free{background:#fbbf24}.bingo-header span{color:#000}.bingo-grid{gap:2px}.bingo-header{gap:2px}}
 </style>
 </head>
@@ -70,6 +85,23 @@ footer a{color:var(--accent);text-decoration:none}
 <button class="primary" onclick="generateCards()">New Game</button>
 <button onclick="window.print()">🖨 Print</button>
 <button onclick="resetMarks()">Reset Marks</button>
+<button onclick="toggleCustomPanel()">✏️ Custom Tricks</button>
+</div>
+
+<div class="custom-panel" id="customPanel" style="display:none">
+<div class="custom-inner">
+<h3>✏️ Your Custom Tricks</h3>
+<p class="custom-hint">Add your own tricks to the pool. They'll be saved and mixed into every game.</p>
+<div class="custom-input-row">
+<input type="text" id="customTrickInput" placeholder="e.g. Laser Heel Late Flip" maxlength="40" onkeydown="if(event.key==='Enter')addCustomTrick()">
+<button class="primary" onclick="addCustomTrick()">Add</button>
+</div>
+<div class="custom-tags" id="customTags"></div>
+<div class="custom-actions">
+<span class="custom-count" id="customCount"></span>
+<button onclick="clearCustomTricks()">Clear All</button>
+</div>
+</div>
 </div>
 
 <div class="player-tabs" id="playerTabs"></div>
@@ -91,11 +123,50 @@ pro:["Impossible","Dolphin Flip","Gazelle Flip","Merlin Twist","Nightmare Flip",
 };
 
 let cards=[],currentPlayer=0,marks={};
+let customTricks=JSON.parse(localStorage.getItem('skateBingoCustomTricks')||'[]');
+
+function saveCustomTricks(){localStorage.setItem('skateBingoCustomTricks',JSON.stringify(customTricks))}
+
+function toggleCustomPanel(){
+const p=document.getElementById('customPanel');
+p.style.display=p.style.display==='none'?'block':'none';
+renderCustomTags();
+}
+
+function addCustomTrick(){
+const input=document.getElementById('customTrickInput');
+const trick=input.value.trim();
+if(!trick)return;
+if(customTricks.some(t=>t.toLowerCase()===trick.toLowerCase())){input.value='';return}
+customTricks.push(trick);
+saveCustomTricks();
+input.value='';
+renderCustomTags();
+}
+
+function removeCustomTrick(i){
+customTricks.splice(i,1);
+saveCustomTricks();
+renderCustomTags();
+}
+
+function clearCustomTricks(){
+if(!customTricks.length)return;
+customTricks=[];
+saveCustomTricks();
+renderCustomTags();
+}
+
+function renderCustomTags(){
+const container=document.getElementById('customTags');
+const count=document.getElementById('customCount');
+container.innerHTML=customTricks.map((t,i)=>`<span class="custom-tag">${t}<span class="remove-tag" onclick="removeCustomTrick(${i})">✕</span></span>`).join('');
+count.textContent=customTricks.length?`${customTricks.length} custom trick${customTricks.length>1?'s':''}`:'';}
 
 function getTrickPool(){
 const d=document.getElementById('difficulty').value;
-if(d==='mixed')return[...TRICKS.beginner,...TRICKS.intermediate,...TRICKS.advanced,...TRICKS.pro];
-return TRICKS[d];
+if(d==='mixed')return[...TRICKS.beginner,...TRICKS.intermediate,...TRICKS.advanced,...TRICKS.pro,...customTricks];
+return[...TRICKS[d],...customTricks];
 }
 
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
