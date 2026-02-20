@@ -69,6 +69,8 @@ footer a{color:var(--accent);text-decoration:none}
 .custom-count{font-size:.75rem;color:var(--muted)}
 .custom-actions button{font-size:.75rem;padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer}
 .custom-actions button:hover{border-color:var(--accent2);color:var(--accent2)}
+.cell.corner-target{border-color:var(--accent2);box-shadow:inset 0 0 8px #ef444422}
+.cell.corner-target.marked{border-color:var(--green);box-shadow:inset 0 0 8px #22c55e22}
 @media print{body{background:#fff;color:#000}.controls,.player-tabs,footer,header p{display:none}h1{-webkit-text-fill-color:#000;font-size:1.5rem}.cell{border:2px solid #000;background:#fff;color:#000;font-size:.6rem}.cell.marked{background:#fef3c7}.cell.free{background:#fbbf24}.bingo-header span{color:#000}.bingo-grid{gap:2px}.bingo-header{gap:2px}}
 </style>
 </head>
@@ -85,6 +87,11 @@ footer a{color:var(--accent);text-decoration:none}
 <option value="advanced">Advanced</option>
 <option value="pro">Pro</option>
 <option value="mixed">Mixed Bag</option>
+</select>
+<select id="gameMode" onchange="renderGrid();renderTabs();renderScore()">
+<option value="line">Classic (Line)</option>
+<option value="4corners">4 Corners</option>
+<option value="blackout">Blackout</option>
 </select>
 <select id="players">
 <option value="1">1 Player</option>
@@ -238,13 +245,16 @@ const grid=document.getElementById('grid');
 const card=cards[currentPlayer];
 const diffs=cardDifficulties[currentPlayer]||[];
 const m=marks[currentPlayer];
+const mode=getGameMode();
+const corners=new Set([0,4,20,24]);
 grid.innerHTML=card.map((t,i)=>{
 if(t==='FREE')return`<div class="cell free">FREE ⭐</div>`;
 const marked=m.has(i)?'marked':'';
+const corner=mode==='4corners'&&corners.has(i)?'corner-target':'';
 const d=diffs[i];
 const badge=d?`<span class="diff-badge ${DIFF_BADGE[d]}">${DIFF_LABELS[d]}</span>`:'';
 const pts=scoringEnabled&&d?`<span class="pts">${DIFF_POINTS[d]}pt</span>`:'';
-return`<div class="cell ${marked}" onclick="toggleCell(${i})">${badge}${t}${pts}</div>`;
+return`<div class="cell ${marked} ${corner}" onclick="toggleCell(${i})">${badge}${t}${pts}</div>`;
 }).join('');
 }
 
@@ -258,8 +268,18 @@ if(checkBingo(currentPlayer))showBingo();
 renderTabs();
 }
 
+function getGameMode(){return document.getElementById('gameMode').value}
+
 function checkBingo(p){
 const m=marks[p];
+const mode=getGameMode();
+if(mode==='blackout'){
+for(let i=0;i<25;i++){if(!m.has(i))return false}
+return true;
+}
+if(mode==='4corners'){
+return[0,4,20,24].every(c=>m.has(c));
+}
 const lines=[[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
 [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
 [0,6,12,18,24],[4,8,12,16,20]];
@@ -306,12 +326,21 @@ setTimeout(()=>piece.remove(),4000);
 
 function highlightWinLine(p){
 const m=marks[p];
+const mode=getGameMode();
+const cells=document.querySelectorAll('#grid .cell');
+if(mode==='blackout'){
+for(let i=0;i<25;i++)setTimeout(()=>cells[i]?.classList.add('bingo-win'),i*30);
+return;
+}
+if(mode==='4corners'){
+[0,4,20,24].forEach((idx,i)=>setTimeout(()=>cells[idx]?.classList.add('bingo-win'),i*80));
+return;
+}
 const lines=[[0,1,2,3,4],[5,6,7,8,9],[10,11,12,13,14],[15,16,17,18,19],[20,21,22,23,24],
 [0,5,10,15,20],[1,6,11,16,21],[2,7,12,17,22],[3,8,13,18,23],[4,9,14,19,24],
 [0,6,12,18,24],[4,8,12,16,20]];
 const winLine=lines.find(l=>l.every(c=>m.has(c)));
 if(!winLine)return;
-const cells=document.querySelectorAll('#grid .cell');
 winLine.forEach((idx,i)=>{
 setTimeout(()=>cells[idx]?.classList.add('bingo-win'),i*80);
 });
@@ -325,7 +354,8 @@ setTimeout(()=>document.body.classList.remove('bingo-flash'),600);
 highlightWinLine(currentPlayer);
 const el=document.createElement('div');
 el.className='bingo-alert';
-el.innerHTML='🎉 BINGO!<div class="bingo-sub">Player '+(currentPlayer+1)+' wins!</div>';
+const modeLabel=getGameMode()==='blackout'?'BLACKOUT!':getGameMode()==='4corners'?'4 CORNERS!':'BINGO!';
+el.innerHTML='🎉 '+modeLabel+'<div class="bingo-sub">Player '+(currentPlayer+1)+' wins!</div>';
 document.body.appendChild(el);
 setTimeout(()=>el.remove(),3500);
 }
@@ -346,7 +376,7 @@ if(i===12)return;// FREE
 const d=diffs[i];
 if(d)total+=DIFF_POINTS[d];
 });
-if(checkBingo(p))total+=10;// BINGO bonus
+if(checkBingo(p))total+=mode==='blackout'?25:mode==='4corners'?5:10;// mode bonus
 return total;
 }
 
@@ -358,7 +388,8 @@ const s=getPlayerScore(i);
 const bingo=checkBingo(i)?'🏆':'';
 return`<span class="score-item">${cards.length>1?'P'+(i+1)+': ':'Score: '}<span class="score-val">${s}${bingo}</span></span>`;
 });
-bar.innerHTML=items.join('')+'<span class="score-item" style="font-size:.7rem">(BEG=1 INT=2 ADV=3 PRO=5 +10 BINGO)</span>';
+const modeBonus=getGameMode()==='blackout'?'+25':getGameMode()==='4corners'?'+5':'+10';
+bar.innerHTML=items.join('')+'<span class="score-item" style="font-size:.7rem">(BEG=1 INT=2 ADV=3 PRO=5 '+modeBonus+' WIN)</span>';
 }
 
 function resetMarks(){
@@ -367,7 +398,7 @@ renderGrid();renderTabs();renderScore();
 }
 
 function encodeGameState(){
-const state={d:document.getElementById('difficulty').value,c:cards,m:{}};
+const state={d:document.getElementById('difficulty').value,gm:getGameMode(),c:cards,m:{}};
 for(const p in marks)state.m[p]=[...marks[p]];
 return btoa(JSON.stringify(state));
 }
@@ -402,6 +433,7 @@ if(!encoded){generateCards();return}
 const state=decodeGameState(encoded);
 if(!state||!state.c||!state.c.length){generateCards();return}
 document.getElementById('difficulty').value=state.d||'intermediate';
+document.getElementById('gameMode').value=state.gm||'line';
 document.getElementById('players').value=state.c.length;
 cards=state.c;
 marks={};cardDifficulties=[];
